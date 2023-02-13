@@ -2,6 +2,7 @@
 #include <thread>
 #include <array>
 #include <iostream>
+#include <chrono>
 
 namespace offset
 {
@@ -9,9 +10,14 @@ namespace offset
 	constexpr ::std::ptrdiff_t dwLocalPlayer = 0xDEA964;
 	constexpr ::std::ptrdiff_t dwEntityList = 0x4DFFEF4;
 	constexpr ::std::ptrdiff_t dwClientState = 0x59F19C;
+	constexpr ::std::ptrdiff_t dwClientState_PlayerInfo = 0x52C0;
 
 	//jugador
 	constexpr ::std::ptrdiff_t m_hMyWeapons = 0x2E08;
+
+	//prueba
+	constexpr ::std::ptrdiff_t m_iHealth = 0x100;
+	constexpr ::std::ptrdiff_t m_lifeState = 0x25F;
 
 	//base atribuible
 	constexpr ::std::ptrdiff_t m_flFallbackWear = 0x31E0;
@@ -57,14 +63,26 @@ int main()
 	//conseguir la direccion
 	const auto client = memory.GetModuleAddress("client.dll");
 	const auto engine = memory.GetModuleAddress("engine.dll");
-
+	
+	//CODIGO PARA QUE EL BUCLE SE EJECUTE 10 SEGUNDOS
+	auto start = std::chrono::steady_clock::now();
+	
 	//bucle main
+
 	while (true)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
 		const auto& localPlayer = memory.Read<std::uintptr_t>(client + offset::dwLocalPlayer);
 		const auto& weapons = memory.Read<std::array<unsigned long, 8>>(localPlayer + offset::m_hMyWeapons);
+
+		//SECCION DE PRUEBA
+		const auto& LifeState = memory.Read<std::int32_t>(localPlayer + offset::m_lifeState);
+		const auto& HealthState = memory.Read<std::int32_t>(localPlayer + offset::m_iHealth);
+
+		std::cout << "Estado de vida: "<< LifeState << std::endl;
+		std::cout << "Estado de vida: " << HealthState << std::endl;
+
 
 		//jugador local interaccion de arma
 		for (const auto& handle : weapons)
@@ -80,19 +98,34 @@ int main()
 			{
 				const bool shouldUpdate = memory.Read<std::int32_t>(weapon + offset::m_nFallbackPaintKit) != paint;
 				
-				//forzar al arna a usar valor de fallback
+				//forzar al arma a usar valor de fallback
 				memory.Write<std::int32_t>(weapon + offset::m_iItemIDHigh, -1);
 
 				memory.Write<std::int32_t>(weapon + offset::m_nFallbackPaintKit, paint);
-				memory.Write<float>(weapon + offset::m_flFallbackWear, 0.12f);
+				memory.Write<float>(weapon + offset::m_flFallbackWear, 0.012f); //desgaste
 
 				if (shouldUpdate)
-					memory.Write<std::int32_t>(memory.Read<std::uintptr_t>(engine + offset::dwClientState) + 0x174, -1);
-					std::cout << "csgo reset - Riesgo de BAN \n ";
+					memory.Write<std::int32_t>(memory.Read<std::uintptr_t>(engine + offset::dwClientState) + 0x174, -1); //forzado con reset de texturas
+					std::cout << "csgo reset" << std::endl;
 			}
 		}
+		auto end = std::chrono::steady_clock::now();
+		auto elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+		std::cout << elapsed_time << std::endl;
 
+		if (elapsed_time >= 10) {
+			std::cout << "Presione la tecla '1' para continuar..." << std::endl;
+			char c;
+			do {
+				c = getchar();
+			} while (c != '1');
+
+			//reset de temporizador
+			start = std::chrono::steady_clock::now();
+			end = std::chrono::steady_clock::now();
+
+		}
 	}
-
+	std::cout << "salio del bucle" << std::endl;
 	return 0;
 }
