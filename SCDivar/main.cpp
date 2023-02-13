@@ -37,8 +37,8 @@ constexpr const int GetWeaponPaint(const short& itemDefinition)
 {
 	switch (itemDefinition)
 	{
-	//case 5028: return 5030; //guantes prueba
-	//case 5029: return 5030; //guantes prueba
+		//case 5028: return 5030; //guantes prueba
+		//case 5029: return 5030; //guantes prueba
 
 	case 1: return 764;  //deagle
 	case 4: return 988;  //glock
@@ -59,19 +59,20 @@ constexpr const int GetWeaponPaint(const short& itemDefinition)
 int main()
 {
 	const auto memory = Memory{ "csgo.exe" };
-	
+
 	//conseguir la direccion
 	const auto client = memory.GetModuleAddress("client.dll");
 	const auto engine = memory.GetModuleAddress("engine.dll");
-	
+
 	//CODIGO PARA QUE EL BUCLE SE EJECUTE 10 SEGUNDOS
 	auto start = std::chrono::steady_clock::now();
-	
+
 	//bucle main
 
 	while (true)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(2));
+		int a = 0;
 
 		const auto& localPlayer = memory.Read<std::uintptr_t>(client + offset::dwLocalPlayer);
 		const auto& weapons = memory.Read<std::array<unsigned long, 8>>(localPlayer + offset::m_hMyWeapons);
@@ -80,7 +81,7 @@ int main()
 		const auto& LifeState = memory.Read<std::int32_t>(localPlayer + offset::m_lifeState);
 		const auto& HealthState = memory.Read<std::int32_t>(localPlayer + offset::m_iHealth);
 
-		std::cout << "Estado de vida: "<< LifeState << std::endl;
+		std::cout << "Estado de vida: " << LifeState << std::endl;
 		std::cout << "Estado de vida: " << HealthState << std::endl;
 
 
@@ -97,7 +98,7 @@ int main()
 			if (const auto paint = GetWeaponPaint(memory.Read<short>(weapon + offset::m_iItemDefinitionIndex)))
 			{
 				const bool shouldUpdate = memory.Read<std::int32_t>(weapon + offset::m_nFallbackPaintKit) != paint;
-				
+
 				//forzar al arma a usar valor de fallback
 				memory.Write<std::int32_t>(weapon + offset::m_iItemIDHigh, -1);
 
@@ -106,23 +107,42 @@ int main()
 
 				if (shouldUpdate)
 					memory.Write<std::int32_t>(memory.Read<std::uintptr_t>(engine + offset::dwClientState) + 0x174, -1); //forzado con reset de texturas
-					std::cout << "csgo reset" << std::endl;
+				std::cout << "csgo reset" << std::endl;
 			}
 		}
 		auto end = std::chrono::steady_clock::now();
 		auto elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
 		std::cout << elapsed_time << std::endl;
 
-		if (elapsed_time >= 10) {
-			std::cout << "Presione la tecla '1' para continuar..." << std::endl;
-			char c;
-			do {
-				c = getchar();
-			} while (c != '1');
-
-			//reset de temporizador
-			start = std::chrono::steady_clock::now();
-			end = std::chrono::steady_clock::now();
+		while (LifeState >= 0 && elapsed_time >= 10) {
+			std::cout << "esperando muerte de jugador" << std::endl;
+			const auto& localPlayer = memory.Read<std::uintptr_t>(client + offset::dwLocalPlayer);
+			const auto& LifeState = memory.Read<std::int32_t>(localPlayer + offset::m_lifeState);
+			const auto& HealthState = memory.Read<std::int32_t>(localPlayer + offset::m_iHealth);
+			std::cout << "Estado de vida: " << LifeState << std::endl;
+			std::cout << "Estado de vida: " << HealthState << std::endl;
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			while (LifeState >= 1) {
+				a = a + 1;
+				std::cout << "JUGADOR MUERTO, ESPERANDO FASE DE COMPRA" << std::endl;
+				const auto& localPlayer = memory.Read<std::uintptr_t>(client + offset::dwLocalPlayer);
+				const auto& LifeState = memory.Read<std::int32_t>(localPlayer + offset::m_lifeState);
+				std::cout << "Estado de vida: " << LifeState << std::endl;
+				if (a == 1) {
+					std::this_thread::sleep_for(std::chrono::milliseconds(11000));
+				}
+				if (LifeState == 0) {
+					start = std::chrono::steady_clock::now();
+					end = std::chrono::steady_clock::now();
+					std::cout << "Estado de vida: " << LifeState << std::endl;
+					std::cout << "JUGADOR REVIVIDO" << std::endl;
+					break;
+				}
+			}
+			auto elapsed_time = std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+			if (elapsed_time == 0) {
+				break;
+			}
 
 		}
 	}
